@@ -118,6 +118,10 @@ vim.schedule(function() vim.o.clipboard = 'unnamedplus' end)
 
 -- Enable break indent
 vim.o.breakindent = true
+vim.o.expandtab = true -- expand tab input with spaces characters
+vim.o.smartindent = true -- syntax aware indentations for newline inserts
+vim.o.tabstop = 2 -- num of space characters per tab
+vim.o.shiftwidth = 2 -- spaces per indentation level
 
 -- Enable undo/redo changes even after closing and reopening a file
 vim.o.undofile = true
@@ -148,7 +152,7 @@ vim.o.splitbelow = true
 --   See `:help lua-options`
 --   and `:help lua-guide-options`
 vim.o.list = true
-vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣' }
+vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣', lead = '·' }
 
 -- Preview substitutions live, as you type!
 vim.o.inccommand = 'split'
@@ -256,6 +260,27 @@ rtp:prepend(lazypath)
 -- NOTE: Here is where you install your plugins.
 require('lazy').setup({
   -- NOTE: Plugins can be added via a link or github org/name. To run setup automatically, use `opts = {}`
+  -- nvim v0.8.0
+  {
+    'kdheepak/lazygit.nvim',
+    lazy = true,
+    cmd = {
+      'LazyGit',
+      'LazyGitConfig',
+      'LazyGitCurrentFile',
+      'LazyGitFilter',
+      'LazyGitFilterCurrentFile',
+    },
+    -- optional for floating window border decoration
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+    },
+    -- setting the keybinding for LazyGit with 'keys' is recommended in
+    -- order to load the plugin when the command is run for the first time
+    keys = {
+      { '<leader>lg', '<cmd>LazyGit<cr>', desc = 'LazyGit' },
+    },
+  },
   { 'NMAC427/guess-indent.nvim', opts = {} },
 
   -- Alternatively, use `config = function() ... end` for full control over the configuration.
@@ -600,9 +625,24 @@ require('lazy').setup({
       --  See `:help lsp-config` for information about keys and how to configure
       ---@type table<string, vim.lsp.Config>
       local servers = {
-        -- clangd = {},
-        -- gopls = {},
-        -- pyright = {},
+        clangd = {},
+        gopls = {},
+        pyright = {
+          -- Auto-detect virtualenvs: prefers an active $VIRTUAL_ENV, falls back to ./.venv
+          before_init = function(_, config)
+            local venv_path = os.getenv 'VIRTUAL_ENV'
+            if not venv_path then
+              local cwd_venv = vim.fn.getcwd() .. '/.venv'
+              if vim.fn.isdirectory(cwd_venv) == 1 then venv_path = cwd_venv end
+            end
+            if venv_path then
+              config.settings = vim.tbl_deep_extend('force', config.settings or {}, {
+                python = { pythonPath = venv_path .. '/bin/python' },
+              })
+            end
+          end,
+        },
+        ruff = {},
         -- rust_analyzer = {},
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -658,6 +698,9 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         -- You can add other tools here that you want Mason to install
+        'goimports', -- Import organizer
+        'gofumpt', -- Stricter formatter (optional, superset of gofmt)
+        'black', -- Python formatter
       })
 
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
@@ -689,7 +732,7 @@ require('lazy').setup({
         -- You can specify filetypes to autoformat on save here:
         local enabled_filetypes = {
           -- lua = true,
-          -- python = true,
+          python = true,
         }
         if enabled_filetypes[vim.bo[bufnr].filetype] then
           return { timeout_ms = 500 }
@@ -704,7 +747,7 @@ require('lazy').setup({
       formatters_by_ft = {
         -- rust = { 'rustfmt' },
         -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
+        python = { 'black' },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
@@ -805,27 +848,27 @@ require('lazy').setup({
     },
   },
 
-  { -- You can easily change to a different colorscheme.
-    -- Change the name of the colorscheme plugin below, and then
-    -- change the command in the config to whatever the name of that colorscheme is.
-    --
-    -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
-    'folke/tokyonight.nvim',
-    priority = 1000, -- Make sure to load this before all the other start plugins.
-    config = function()
-      ---@diagnostic disable-next-line: missing-fields
-      require('tokyonight').setup {
-        styles = {
-          comments = { italic = false }, -- Disable italics in comments
-        },
-      }
-
-      -- Load the colorscheme here.
-      -- Like many other themes, this one has different styles, and you could load
-      -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-      vim.cmd.colorscheme 'tokyonight-night'
-    end,
-  },
+  --   { -- You can easily change to a different colorscheme.
+  --     -- Change the name of the colorscheme plugin below, and then
+  --     -- change the command in the config to whatever the name of that colorscheme is.
+  --     --
+  --     -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
+  --     'folke/tokyonight.nvim',
+  --     priority = 1000, -- Make sure to load this before all the other start plugins.
+  --     config = function()
+  --       ---@diagnostic disable-next-line: missing-fields
+  --       require('tokyonight').setup {
+  --         styles = {
+  --           comments = { italic = false }, -- Disable italics in comments
+  --         },
+  --       }
+  --
+  --       -- Load the colorscheme here.
+  --       -- Like many other themes, this one has different styles, and you could load
+  --       -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
+  --       vim.cmd.colorscheme 'tokyonight-night'
+  --     end,
+  --   },
 
   -- Highlight todo, notes, etc in comments
   {
@@ -986,5 +1029,38 @@ require('lazy').setup({
   },
 })
 
+vim.cmd.colorscheme 'default'
+
+-- custom stuff
+vim.opt.colorcolumn = '80' -- or whatever width you prefer
+vim.api.nvim_set_hl(0, 'ColorColumn', { bg = '#3b3b3b' })
+vim.opt.textwidth = 80 -- column to wrap at
+vim.opt.formatoptions:append 't' -- auto-wrap text as you type
+
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
+--
+
+require('conform').setup {
+  formatters_by_ft = {
+    go = { 'goimports', 'gofumpt' },
+  },
+  format_on_save = {
+    timeout_ms = 500,
+    lsp_fallback = true,
+  },
+}
+
+-- Show diagnostic float on cursor hold
+vim.api.nvim_create_autocmd('CursorHold', {
+  callback = function()
+    vim.diagnostic.open_float(nil, {
+      focusable = false,
+      close_events = { 'BufLeave', 'CursorMoved', 'InsertEnter', 'FocusLost' },
+      border = 'rounded',
+      source = 'always',
+      prefix = ' ',
+      scope = 'cursor',
+    })
+  end,
+})
